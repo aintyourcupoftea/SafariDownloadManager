@@ -44,7 +44,7 @@ gh repo create aintyourcupoftea/homebrew-tap --public --source=. --push
 
 ```bash
 brew untap aintyourcupoftea/tap 2>/dev/null
-brew tap aintyourcupoftea/tap
+brew tap aintyourcupoftea/aintyourcupoftea
 brew install safari-download-manager
 brew test safari-download-manager
 sdm setup

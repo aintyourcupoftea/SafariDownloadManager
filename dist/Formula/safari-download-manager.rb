@@ -3,7 +3,7 @@ class SafariDownloadManager < Formula
   homepage "https://github.com/aintyourcupoftea/SafariDownloadManager"
   url "https://github.com/aintyourcupoftea/SafariDownloadManager/archive/refs/tags/v0.1.0.tar.gz"
   sha256 "REPLACE_WITH_RELEASE_SHA256"
-  license "MIT"
+  license "GPL-3.0-or-later"
   head "https://github.com/aintyourcupoftea/SafariDownloadManager.git", branch: "main"
 
   depends_on "aria2"

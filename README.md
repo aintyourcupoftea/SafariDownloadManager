@@ -5,7 +5,7 @@ Safari and it goes to a parallel-connection download engine instead of Safari â€
 and Safari stays on the page it was on.
 
 ```
-brew tap aintyourcupoftea/tap
+brew tap aintyourcupoftea/aintyourcupoftea
 brew install safari-download-manager
 sdm setup      # generates the CA, writes launch agents, starts services
 sdm on
@@ -102,4 +102,4 @@ reports welcome.
 
 ## License
 
-MIT
+GPL-3.0-or-later
