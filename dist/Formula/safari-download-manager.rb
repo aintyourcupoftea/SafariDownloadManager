@@ -7,7 +7,6 @@ class SafariDownloadManager < Formula
   head "https://github.com/aintyourcupoftea/SafariDownloadManager.git", branch: "main"
 
   depends_on "aria2"
-  depends_on :macos
   # Verified on macOS 26 (Tahoe). Local-mode interception and the QUIC
   # workaround have not been validated on older majors.
   depends_on macos: :sonoma
@@ -18,9 +17,11 @@ class SafariDownloadManager < Formula
 
     # Build the SwiftUI front-end if a toolchain is present. The CLI is fully
     # functional without it, so a missing toolchain is not fatal.
-    if File.directory?("app/SafariDM/Sources") && which("swiftc")
-      sdk = Utils.safe_popen_read("xcrun", "--show-sdk-path", "--sdk", "macosx").chomp
-      system "xcrun", "swiftc", "-O",
+    has_swift = File.executable?("/usr/bin/xcrun") &&
+                quiet_system("/usr/bin/xcrun", "--find", "swiftc")
+    if File.directory?("app/SafariDM/Sources") && has_swift
+      sdk = Utils.safe_popen_read("/usr/bin/xcrun", "--show-sdk-path", "--sdk", "macosx").chomp
+      system "/usr/bin/xcrun", "swiftc", "-O",
              "-target", "arm64-apple-macosx14.0", "-sdk", sdk,
              "-framework", "SwiftUI", "-framework", "AppKit", "-framework", "Foundation",
              *Dir["app/SafariDM/Sources/*.swift"], "-o", "SafariDM"
