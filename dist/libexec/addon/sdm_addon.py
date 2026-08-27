@@ -247,12 +247,29 @@ def _classify(headers, url, clen):
     cd = (headers.get("content-disposition", "") or "").lower()
     ctype = (headers.get("content-type", "") or "").split(";")[0].strip().lower()
     path = urllib.parse.urlparse(url).path.lower()
+
+    def plausible_size():
+        """A missing Content-Length must not be a free pass.
+
+        Chunked junk has no length either, and `clen == 0 or clen >= MIN_SIZE`
+        let all of it through - that is how Google's autocomplete endpoint,
+        served as `Content-Disposition: attachment; filename="f.txt"` with no
+        length, got "downloaded" 13 times. When the size is unknown we only
+        trust the response if the filename ends in a real download extension.
+        """
+        if clen >= MIN_SIZE:
+            return True
+        if clen > 0:
+            return False
+        name = _name_from({"content-disposition": cd}, url).lower()
+        return name.endswith(DOWNLOAD_EXTS)
+
     if any(ctype.startswith(p) for p in NEVER_TYPES_PREFIX) and "attachment" not in cd:
         return False
     if "attachment" in cd:
-        return clen == 0 or clen >= MIN_SIZE
+        return plausible_size()
     if ctype in DOWNLOAD_TYPES or path.endswith(DOWNLOAD_EXTS):
-        return clen == 0 or clen >= MIN_SIZE
+        return plausible_size()
     return False
 
 
@@ -317,6 +334,13 @@ def responseheaders(flow: http.HTTPFlow):
     if resp is None or resp.status_code != 200:
         return
     if flow.request.method != "GET":
+        return
+    # Only a top-level navigation can start a download the user asked for.
+    # Background XHR/fetch (sec-fetch-dest: empty|script|image|...) never can,
+    # and letting it through is how Google's autocomplete endpoint - served as
+    # `Content-Disposition: attachment; filename="f.txt"` - got "downloaded"
+    # 13 times.
+    if flow.request.headers.get("sec-fetch-dest", "") != "document":
         return
     if flow.request.headers.get("sec-fetch-mode", "") == "cors":
         return
