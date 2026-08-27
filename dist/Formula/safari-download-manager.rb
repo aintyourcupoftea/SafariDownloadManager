@@ -9,7 +9,9 @@ class SafariDownloadManager < Formula
   depends_on "aria2"
   depends_on "mitmproxy"
   depends_on :macos
-  depends_on macos: :ventura
+  # Verified on macOS 26 (Tahoe). Local-mode interception and the QUIC
+  # workaround have not been validated on older majors.
+  depends_on macos: :sonoma
 
   def install
     libexec.install Dir["dist/libexec/*"]
@@ -73,6 +75,6 @@ class SafariDownloadManager < Formula
   end
 
   test do
-    assert_match "safari-download-manager", shell_output("#{bin}/sdm 2>&1")
+    assert_match "IDM-style download interception", shell_output("#{bin}/sdm 2>&1")
   end
 end

@@ -7,9 +7,18 @@ and Safari stays on the page it was on.
 ```
 brew tap aintyourcupoftea/tap
 brew install safari-download-manager
-sdm setup
+sdm setup      # generates the CA, writes launch agents, starts services
 sdm on
 ```
+
+> **Not published yet.** The tap above goes live once the steps in
+> [PUBLISHING.md](PUBLISHING.md) are done. Until then, install from a clone:
+>
+> ```
+> brew install mitmproxy aria2
+> git clone https://github.com/aintyourcupoftea/safari-download-manager
+> cd safari-download-manager && ./dist/bin/sdm setup && ./dist/bin/sdm on
+> ```
 
 ## Why this didn't exist
 
@@ -82,6 +91,14 @@ than silent.
 Never kill the proxy mid-download. It detaches the macOS `NEAppProxyProvider`
 binding and silently stops all capture. `sdm status` reports
 `redirector NOT attached`; `sdm restart` plus a Safari relaunch fixes it.
+
+## Compatibility
+
+Developed and verified on **macOS 26.6.2 (Tahoe), Apple Silicon, Safari 26.6.2**.
+The formula allows Sonoma and later, but interception depends on
+`NEAppProxyProvider` local mode resolving Safari's *responsible* process, which
+has only been confirmed on Tahoe. Older majors are unverified, not unsupported —
+reports welcome.
 
 ## License
 

@@ -81,22 +81,31 @@ BYP
   fi
   ok "bypass list"
 
-  # mitmproxy CA - generate if absent
-  if [ ! -f "$HOME/.mitmproxy/mitmproxy-ca-cert.pem" ]; then
-    warn "generating mitmproxy CA..."
+  # mitmproxy CA - generate if absent. mitmdump writes the CA on first start,
+  # so we start it on a throwaway port, wait for the file, then stop it.
+  local CA="$HOME/.mitmproxy/mitmproxy-ca-cert.pem"
+  if [ ! -f "$CA" ]; then
+    warn "generating interception CA..."
     mkdir -p "$HOME/.mitmproxy"
-    ( mitmdump --mode regular@45999 >/dev/null 2>&1 & echo $! > /tmp/.sdm_ca.pid )
-    sleep 5; kill "$(cat /tmp/.sdm_ca.pid)" 2>/dev/null; rm -f /tmp/.sdm_ca.pid
+    mitmdump --mode regular@45999 >/dev/null 2>&1 &
+    local capid=$!
+    for _ in $(seq 1 30); do [ -f "$CA" ] && break; sleep 0.5; done
+    kill "$capid" 2>/dev/null; wait "$capid" 2>/dev/null
   fi
+  if [ ! -f "$CA" ]; then
+    bad "could not generate the CA at $CA"
+    echo "    Try running 'mitmdump --version' to check your mitmproxy install."
+    exit 1
+  fi
+  ok "CA present"
 
   # Trust it at USER level. No sudo, no System keychain - scoped to this user
   # and removable with one command.
-  if security verify-cert -c "$HOME/.mitmproxy/mitmproxy-ca-cert.pem" -p ssl >/dev/null 2>&1; then
+  if security verify-cert -c "$CA" -p ssl >/dev/null 2>&1; then
     ok "CA already trusted"
   else
     if security add-trusted-cert -r trustRoot \
-         -k "$HOME/Library/Keychains/login.keychain-db" \
-         "$HOME/.mitmproxy/mitmproxy-ca-cert.pem" >/dev/null 2>&1; then
+         -k "$HOME/Library/Keychains/login.keychain-db" "$CA" >/dev/null 2>&1; then
       ok "CA trusted (user keychain, no sudo)"
     else
       warn "could not add CA automatically - run:"
@@ -145,7 +154,14 @@ cmd_doctor() {
 
 cmd_uninstall() {
   for l in "$LBL_PROXY" "$LBL_ARIA2" "$LBL_WATCH"; do unload "$l"; rm -f "$AGENTS/$l.plist"; done
-  security delete-certificate -c mitmproxy "$HOME/Library/Keychains/login.keychain-db" 2>/dev/null
+  # Match the exact cert we trusted by hash - "-c mitmproxy" would also match an
+  # unrelated mitmproxy root the user set up themselves.
+  local CA="$HOME/.mitmproxy/mitmproxy-ca-cert.pem"
+  if [ -f "$CA" ]; then
+    local sha; sha=$(openssl x509 -in "$CA" -noout -fingerprint -sha1 2>/dev/null | sed 's/.*=//;s/://g')
+    [ -n "$sha" ] && security delete-certificate -Z "$sha" \
+        "$HOME/Library/Keychains/login.keychain-db" 2>/dev/null
+  fi
   ok "services stopped, agents removed, CA untrusted"
   echo "  State kept at: $SDM_HOME  (delete manually if you want it gone)"
   echo "  Disable the mitmproxy extension in System Settings → Network Extensions."
@@ -165,7 +181,7 @@ case "${1:-}" in
   stop)      for l in "$LBL_PROXY" "$LBL_ARIA2" "$LBL_WATCH"; do unload "$l"; done; ok "stopped" ;;
   restart)   "$0" stop; sleep 2; "$0" start ;;
   uninstall) cmd_uninstall ;;
-  *) cat <<USAGE
+  ""|help|-h|--help|*) cat <<USAGE
 safari-download-manager - IDM-style download interception for Safari
 
   sdm setup       first-run: CA, services, launch agents
