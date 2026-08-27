@@ -61,9 +61,28 @@ unload() { launchctl unload "$AGENTS/$1.plist" 2>/dev/null; }
 cmd_setup() {
   bold "Setting up Safari Download Manager"
 
-  for t in mitmdump aria2c; do
-    need "$t" && ok "found $t" || { bad "$t not found - install it (brew install mitmproxy aria2)"; exit 1; }
-  done
+  # mitmproxy ships as a Homebrew cask and carries the signed macOS network
+  # redirector. A formula cannot depend on a cask, so we install it here.
+  if need mitmdump; then
+    ok "found mitmdump"
+  elif need brew; then
+    warn "mitmproxy missing - installing the cask (this carries the network redirector)"
+    if brew install --cask mitmproxy; then
+      ok "mitmproxy installed"
+      hash -r 2>/dev/null
+    else
+      bad "could not install mitmproxy"
+      echo "    Run: brew install --cask mitmproxy"
+      exit 1
+    fi
+  else
+    bad "mitmdump not found and Homebrew is unavailable"
+    echo "    Install mitmproxy from https://mitmproxy.org and re-run 'sdm setup'."
+    exit 1
+  fi
+
+  if need aria2c; then ok "found aria2c"
+  else bad "aria2c not found - run: brew install aria2"; exit 1; fi
 
   mkdir -p "$SDM_HOME"/{state/aria2,logs,config}
   ok "state dir: $SDM_HOME"

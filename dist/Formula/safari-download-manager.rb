@@ -7,9 +7,6 @@ class SafariDownloadManager < Formula
   head "https://github.com/aintyourcupoftea/SafariDownloadManager.git", branch: "main"
 
   depends_on "aria2"
-  # mitmproxy migrated from homebrew/core to homebrew/cask, so it is a cask
-  # dependency. Declaring it as a formula fails with "No available formula".
-  depends_on cask: "mitmproxy"
   depends_on :macos
   # Verified on macOS 26 (Tahoe). Local-mode interception and the QUIC
   # workaround have not been validated on older majors.
@@ -52,6 +49,11 @@ class SafariDownloadManager < Formula
       First-time setup (no sudo required):
 
         sdm setup
+
+      mitmproxy is distributed as a Homebrew *cask*, and a formula cannot depend
+      on a cask, so `sdm setup` installs it for you if it is missing. The cask is
+      required rather than optional: it carries the signed macOS network
+      redirector that interception is built on.
 
       That generates the interception CA and trusts it in your LOGIN keychain
       only, writes launch agents, and starts the services.
