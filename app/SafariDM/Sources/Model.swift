@@ -5,6 +5,7 @@ import SwiftUI
 final class AppModel: ObservableObject {
     @Published var downloads: [Download] = []
     @Published var daemonUp = false
+    @Published var lastError: String? = nil
     @Published var intercepting = false
     @Published var proxyUp = false
 
@@ -28,7 +29,12 @@ final class AppModel: ObservableObject {
     }
 
     private func tick() async {
-        let up = await Aria2Client.shared.ping()
+        var up = await Aria2Client.shared.ping()
+        if !up {
+            // Could be a rotated secret rather than a dead daemon.
+            await Aria2Client.shared.reloadSecret()
+            up = await Aria2Client.shared.ping()
+        }
         let items = up ? await Aria2Client.shared.fetchAll() : []
         // Newest first, but anything still moving floats to the top.
         let sorted = items.sorted { a, b in
@@ -37,6 +43,8 @@ final class AppModel: ObservableObject {
         }
         await MainActor.run {
             self.daemonUp = up
+            self.lastError = up ? nil
+                : "Can't reach the download engine. Run `sdm status` in a terminal."
             if self.downloads != sorted { self.downloads = sorted }
             self.refreshToggles()
         }

@@ -189,11 +189,14 @@ struct ContentView: View {
             Image(systemName: "tray.and.arrow.down")
                 .font(.system(size: 34, weight: .thin)).foregroundStyle(.tertiary)
             Text("No downloads yet").font(.system(size: 13, weight: .medium))
-            Text(model.intercepting
-                 ? "Click any download in Safari and it lands here."
-                 : "Interception is off — Safari will download normally.")
-                .font(.system(size: 11)).foregroundStyle(.secondary)
+            Text(model.lastError
+                 ?? (model.intercepting
+                     ? "Click any download in Safari and it lands here."
+                     : "Interception is off — Safari will download normally."))
+                .font(.system(size: 11))
+                .foregroundStyle(model.lastError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.failRed))
                 .multilineTextAlignment(.center)
+                .padding(.horizontal, 28)
             Spacer()
         }
         .frame(maxWidth: .infinity)

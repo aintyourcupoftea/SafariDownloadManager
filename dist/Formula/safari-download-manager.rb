@@ -1,10 +1,10 @@
 class SafariDownloadManager < Formula
   desc "IDM-style download interception for Safari"
-  homepage "https://github.com/aintyourcupoftea/safari-download-manager"
-  url "https://github.com/aintyourcupoftea/safari-download-manager/archive/refs/tags/v0.1.0.tar.gz"
+  homepage "https://github.com/aintyourcupoftea/SafariDownloadManager"
+  url "https://github.com/aintyourcupoftea/SafariDownloadManager/archive/refs/tags/v0.1.0.tar.gz"
   sha256 "REPLACE_WITH_RELEASE_SHA256"
   license "MIT"
-  head "https://github.com/aintyourcupoftea/safari-download-manager.git", branch: "main"
+  head "https://github.com/aintyourcupoftea/SafariDownloadManager.git", branch: "main"
 
   depends_on "aria2"
   depends_on "mitmproxy"

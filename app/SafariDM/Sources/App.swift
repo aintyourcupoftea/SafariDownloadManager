@@ -1,7 +1,11 @@
 import SwiftUI
 
-let sdmRoot = ProcessInfo.processInfo.environment["SDM_ROOT"]
-    ?? "/Users/aintyourcupoftea/Development/SafariDownloadManager"
+/// Runtime state lives in SDM_HOME, exactly as the CLI and daemons resolve it.
+/// Anything else and the app reads a stale rpc.secret and every call fails auth
+/// while the UI just shows an empty list.
+let sdmRoot: String = ProcessInfo.processInfo.environment["SDM_HOME"]
+    ?? (FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/SafariDownloadManager").path)
 
 @main
 struct SafariDMApp: App {

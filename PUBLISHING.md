@@ -6,8 +6,8 @@ Do them in order — the formula's `sha256` depends on the tag existing.
 ## 1. Push the code repo
 
 ```bash
-gh repo create aintyourcupoftea/safari-download-manager --public --source=. --push
-# or: git remote add origin git@github.com:aintyourcupoftea/safari-download-manager.git
+gh repo create aintyourcupoftea/SafariDownloadManager --public --source=. --push
+# or: git remote add origin git@github.com:aintyourcupoftea/SafariDownloadManager.git
 #     git push -u origin main
 ```
 
@@ -21,7 +21,7 @@ git push origin v0.1.0
 ## 3. Get the tarball hash
 
 ```bash
-curl -sL https://github.com/aintyourcupoftea/safari-download-manager/archive/refs/tags/v0.1.0.tar.gz \
+curl -sL https://github.com/aintyourcupoftea/SafariDownloadManager/archive/refs/tags/v0.1.0.tar.gz \
   | shasum -a 256
 ```
 

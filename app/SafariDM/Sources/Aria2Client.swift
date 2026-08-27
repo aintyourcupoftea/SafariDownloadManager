@@ -5,13 +5,26 @@ import Foundation
 /// keeps its own copy, so it cannot drift from what is actually on disk.
 actor Aria2Client {
     static let shared = Aria2Client()
-    private let endpoint = URL(string: "http://127.0.0.1:6800/jsonrpc")!
+    private let endpoint: URL = {
+        let port = ProcessInfo.processInfo.environment["SDM_RPC_PORT"] ?? "6800"
+        return URL(string: "http://127.0.0.1:\(port)/jsonrpc")!
+    }()
     private var secret: String = ""
+    private var secretPath: String = ""
 
     func loadSecret(from path: String) {
-        secret = (try? String(contentsOfFile: path, encoding: .utf8))?
+        secretPath = path
+        reloadSecret()
+    }
+
+    /// Re-read on demand: `sdm setup` can rotate the secret while we are running,
+    /// and a stale one fails auth silently.
+    func reloadSecret() {
+        secret = (try? String(contentsOfFile: secretPath, encoding: .utf8))?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
+
+    var hasSecret: Bool { !secret.isEmpty }
 
     private func call(_ method: String, _ params: [Any] = []) async throws -> Any {
         var req = URLRequest(url: endpoint)

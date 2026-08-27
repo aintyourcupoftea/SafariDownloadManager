@@ -16,8 +16,8 @@ sdm on
 >
 > ```
 > brew install mitmproxy aria2
-> git clone https://github.com/aintyourcupoftea/safari-download-manager
-> cd safari-download-manager && ./dist/bin/sdm setup && ./dist/bin/sdm on
+> git clone https://github.com/aintyourcupoftea/SafariDownloadManager
+> cd SafariDownloadManager && ./dist/bin/sdm setup && ./dist/bin/sdm on
 > ```
 
 ## Why this didn't exist
