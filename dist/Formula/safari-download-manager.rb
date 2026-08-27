@@ -15,34 +15,11 @@ class SafariDownloadManager < Formula
     libexec.install Dir["dist/libexec/*"]
     bin.install "dist/bin/sdm"
 
-    # Build the SwiftUI front-end if a toolchain is present. The CLI is fully
-    # functional without it, so a missing toolchain is not fatal.
-    has_swift = File.executable?("/usr/bin/xcrun") &&
-                quiet_system("/usr/bin/xcrun", "--find", "swiftc")
-    if File.directory?("app/SafariDM/Sources") && has_swift
-      sdk = Utils.safe_popen_read("/usr/bin/xcrun", "--show-sdk-path", "--sdk", "macosx").chomp
-      system "/usr/bin/xcrun", "swiftc", "-O",
-             "-target", "arm64-apple-macosx14.0", "-sdk", sdk,
-             "-framework", "SwiftUI", "-framework", "AppKit", "-framework", "Foundation",
-             *Dir["app/SafariDM/Sources/*.swift"], "-o", "SafariDM"
-        app = prefix/"Safari Download Manager.app"
-        (app/"Contents/MacOS").mkpath
-        (app/"Contents/Resources").mkpath
-        cp "SafariDM", app/"Contents/MacOS/SafariDM"
-        (app/"Contents/Info.plist").write <<~PLIST
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0"><dict>
-            <key>CFBundleName</key><string>Safari Download Manager</string>
-            <key>CFBundleIdentifier</key><string>com.sdm.SafariDownloadManager</string>
-            <key>CFBundleExecutable</key><string>SafariDM</string>
-            <key>CFBundlePackageType</key><string>APPL</string>
-            <key>CFBundleShortVersionString</key><string>#{version}</string>
-            <key>LSMinimumSystemVersion</key><string>14.0</string>
-            <key>NSHighResolutionCapable</key><true/>
-          </dict></plist>
-        PLIST
-    end
+    # No compiler is used on purpose. Building the SwiftUI front-end here made
+    # Homebrew enforce its Xcode floor ("Your Xcode is too outdated"), which
+    # blocks installation for anyone whose Xcode does not match Homebrew's
+    # expectation - a hard failure for a tool that is otherwise pure scripts.
+    # The GUI ships separately; the CLI is fully functional without it.
   end
 
   def caveats
@@ -68,10 +45,6 @@ class SafariDownloadManager < Formula
 
         sdm on
         sdm status
-
-      The GUI, if it was built:
-
-        open #{prefix}/"Safari Download Manager.app"
 
       To remove everything, including untrusting the CA:
 
