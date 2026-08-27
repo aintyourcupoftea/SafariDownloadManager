@@ -1,0 +1,11 @@
+# Hosts we never decrypt (TLS passthrough). Pinned or CT-strict endpoints that
+# reject a locally-trusted root. Downloads from these are NOT intercepted -
+# that is the deliberate trade: correctness of the site beats capturing its files.
+(^|\.)apple\.com:443$
+(^|\.)icloud\.com:443$
+(^|\.)cdn-apple\.com:443$
+(^|\.)mzstatic\.com:443$
+(^|\.)aaplimg\.com:443$
+(^|\.)itunes\.apple\.com:443$
+mask\.icloud\.com
+(^|\.)push\.apple\.com:443$

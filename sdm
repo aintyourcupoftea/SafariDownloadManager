@@ -1,0 +1,16 @@
+#!/bin/bash
+# sdm - control SafariDownloadManager
+R="/Users/aintyourcupoftea/Development/SafariDownloadManager"
+case "$1" in
+  on)      echo probe   > "$R/state/STRATEGY"; echo "interception ON" ;;
+  off)     echo off     > "$R/state/STRATEGY"; echo "interception OFF (Safari downloads normally)" ;;
+  status)  echo "strategy: $(cat "$R/state/STRATEGY" 2>/dev/null)"
+           pgrep -f "aria2c --enable-rpc" >/dev/null && echo "aria2:    daemon up" || echo "aria2:    DOWN"
+           pgrep -f "mitmdump --mode local" >/dev/null && echo "proxy:    running" || echo "proxy:    STOPPED"
+           pgrep -f redirector >/dev/null && echo "redirect: attached" || echo "redirect: NOT ATTACHED (restart Safari + proxy)" ;;
+  queue|ls) python3 "$R/daemon/status.py" ;;
+  watch)   while true; do clear; echo "SafariDownloadManager"; echo; python3 "$R/daemon/status.py"; sleep 1; done ;;
+  misses)  tail -20 "$R/logs/misses.log" 2>/dev/null || echo "(no misses recorded - good)" ;;
+  log)     tail -f "$R/logs/agent.log" ;;
+  *) echo "usage: sdm {on|off|status|queue|watch|misses|log}" ;;
+esac

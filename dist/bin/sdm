@@ -1,0 +1,182 @@
+#!/bin/bash
+# safari-download-manager - IDM-style download interception for Safari.
+set -uo pipefail
+
+SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+: "${SDM_LIBEXEC:=$(cd "$SELF/../libexec" 2>/dev/null && pwd)}"
+: "${SDM_HOME:=$HOME/Library/Application Support/SafariDownloadManager}"
+: "${SDM_DOWNLOAD_DIR:=$HOME/Downloads}"
+: "${SDM_RPC_PORT:=6800}"
+export SDM_LIBEXEC SDM_HOME SDM_DOWNLOAD_DIR SDM_RPC_PORT
+
+AGENTS="$HOME/Library/LaunchAgents"
+LBL_PROXY="com.sdm.proxy"; LBL_ARIA2="com.sdm.aria2d"; LBL_WATCH="com.sdm.watcher"
+
+bold() { printf '\033[1m%s\033[0m\n' "$*"; }
+ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }
+warn() { printf '  \033[33m!\033[0m %s\n' "$*"; }
+bad()  { printf '  \033[31m✗\033[0m %s\n' "$*"; }
+
+need() { command -v "$1" >/dev/null 2>&1; }
+
+write_agent() { # label, program...
+  local label="$1"; shift
+  mkdir -p "$AGENTS"
+  {
+    echo '<?xml version="1.0" encoding="UTF-8"?>'
+    echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
+    echo '<plist version="1.0"><dict>'
+    echo "  <key>Label</key><string>$label</string>"
+    echo '  <key>ProgramArguments</key><array>'
+    for a in "$@"; do echo "    <string>$a</string>"; done
+    echo '  </array>'
+    echo '  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>'
+    echo '  <key>EnvironmentVariables</key><dict>'
+    echo "    <key>SDM_HOME</key><string>$SDM_HOME</string>"
+    echo "    <key>SDM_LIBEXEC</key><string>$SDM_LIBEXEC</string>"
+    echo "    <key>SDM_DOWNLOAD_DIR</key><string>$SDM_DOWNLOAD_DIR</string>"
+    echo "    <key>SDM_RPC_PORT</key><string>$SDM_RPC_PORT</string>"
+    echo "    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>"
+    echo '  </dict>'
+    echo "  <key>StandardOutPath</key><string>$SDM_HOME/logs/$label.log</string>"
+    echo "  <key>StandardErrorPath</key><string>$SDM_HOME/logs/$label.log</string>"
+    echo '</dict></plist>'
+  } > "$AGENTS/$label.plist"
+}
+
+load()   { launchctl unload "$AGENTS/$1.plist" 2>/dev/null; launchctl load "$AGENTS/$1.plist" 2>/dev/null; }
+unload() { launchctl unload "$AGENTS/$1.plist" 2>/dev/null; }
+
+cmd_setup() {
+  bold "Setting up Safari Download Manager"
+
+  for t in mitmdump aria2c; do
+    need "$t" && ok "found $t" || { bad "$t not found - install it (brew install mitmproxy aria2)"; exit 1; }
+  done
+
+  mkdir -p "$SDM_HOME"/{state/aria2,logs,config}
+  ok "state dir: $SDM_HOME"
+
+  [ -f "$SDM_HOME/state/rpc.secret" ] || {
+    head -c 24 /dev/urandom | xxd -p | tr -d '\n' > "$SDM_HOME/state/rpc.secret"
+    chmod 600 "$SDM_HOME/state/rpc.secret"
+  }
+  ok "rpc secret"
+
+  [ -f "$SDM_HOME/state/STRATEGY" ] || echo off > "$SDM_HOME/state/STRATEGY"
+
+  if [ ! -f "$SDM_HOME/config/bypass.txt" ]; then
+    cat > "$SDM_HOME/config/bypass.txt" <<'BYP'
+# Hosts never decrypted (TLS passthrough). Pinned / CT-strict endpoints reject a
+# locally-trusted root. Downloads from these are NOT intercepted - a deliberate
+# trade: the site keeps working.
+(^|\.)apple\.com:443$
+(^|\.)icloud\.com:443$
+(^|\.)cdn-apple\.com:443$
+(^|\.)mzstatic\.com:443$
+(^|\.)aaplimg\.com:443$
+mask\.icloud\.com
+(^|\.)push\.apple\.com:443$
+BYP
+  fi
+  ok "bypass list"
+
+  # mitmproxy CA - generate if absent
+  if [ ! -f "$HOME/.mitmproxy/mitmproxy-ca-cert.pem" ]; then
+    warn "generating mitmproxy CA..."
+    mkdir -p "$HOME/.mitmproxy"
+    ( mitmdump --mode regular@45999 >/dev/null 2>&1 & echo $! > /tmp/.sdm_ca.pid )
+    sleep 5; kill "$(cat /tmp/.sdm_ca.pid)" 2>/dev/null; rm -f /tmp/.sdm_ca.pid
+  fi
+
+  # Trust it at USER level. No sudo, no System keychain - scoped to this user
+  # and removable with one command.
+  if security verify-cert -c "$HOME/.mitmproxy/mitmproxy-ca-cert.pem" -p ssl >/dev/null 2>&1; then
+    ok "CA already trusted"
+  else
+    if security add-trusted-cert -r trustRoot \
+         -k "$HOME/Library/Keychains/login.keychain-db" \
+         "$HOME/.mitmproxy/mitmproxy-ca-cert.pem" >/dev/null 2>&1; then
+      ok "CA trusted (user keychain, no sudo)"
+    else
+      warn "could not add CA automatically - run:"
+      echo "    security add-trusted-cert -r trustRoot -k ~/Library/Keychains/login.keychain-db ~/.mitmproxy/mitmproxy-ca-cert.pem"
+    fi
+  fi
+
+  write_agent "$LBL_ARIA2" "$SDM_LIBEXEC/daemon/aria2d.sh"
+  write_agent "$LBL_PROXY" "$SDM_LIBEXEC/daemon/proxy.sh"
+  write_agent "$LBL_WATCH" "$SDM_LIBEXEC/watcher/watch.sh"
+  ok "launch agents written"
+
+  load "$LBL_ARIA2"; sleep 2; load "$LBL_PROXY"; load "$LBL_WATCH"
+  ok "services started"
+
+  echo
+  bold "One manual step left"
+  echo "  macOS must approve mitmproxy's network extension:"
+  echo "    System Settings → General → Login Items & Extensions → Network Extensions"
+  echo "  Enable 'network-extension' (org.mitmproxy.macos-redirector)."
+  echo
+  echo "  Then:  sdm on"
+  echo "  Check: sdm status"
+}
+
+cmd_status() {
+  bold "Safari Download Manager"
+  printf '  interception : %s\n' "$(cat "$SDM_HOME/state/STRATEGY" 2>/dev/null || echo '?')"
+  pgrep -f "mitmdump --mode local" >/dev/null && ok "proxy running" || bad "proxy stopped"
+  pgrep -f "aria2c --enable-rpc" >/dev/null && ok "download engine running" || bad "download engine stopped"
+  if pgrep -f "org.mitmproxy.macos-redirector" >/dev/null; then ok "redirector attached"
+  else bad "redirector NOT attached - quit Safari, run 'sdm restart', reopen Safari"; fi
+  systemextensionsctl list 2>/dev/null | grep -q "mitmproxy.*activated enabled" \
+    && ok "network extension approved" || warn "network extension not approved (System Settings)"
+}
+
+cmd_doctor() {
+  cmd_status; echo
+  bold "Diagnostics"
+  printf '  home     : %s\n  libexec  : %s\n  downloads: %s\n' "$SDM_HOME" "$SDM_LIBEXEC" "$SDM_DOWNLOAD_DIR"
+  security verify-cert -c "$HOME/.mitmproxy/mitmproxy-ca-cert.pem" -p ssl >/dev/null 2>&1 \
+    && ok "CA trusted" || bad "CA not trusted - run 'sdm setup'"
+  local m; m=$(wc -l < "$SDM_HOME/logs/misses.log" 2>/dev/null || echo 0)
+  [ "$m" -gt 0 ] && warn "$m missed download(s) - see 'sdm misses'" || ok "no coverage misses"
+}
+
+cmd_uninstall() {
+  for l in "$LBL_PROXY" "$LBL_ARIA2" "$LBL_WATCH"; do unload "$l"; rm -f "$AGENTS/$l.plist"; done
+  security delete-certificate -c mitmproxy "$HOME/Library/Keychains/login.keychain-db" 2>/dev/null
+  ok "services stopped, agents removed, CA untrusted"
+  echo "  State kept at: $SDM_HOME  (delete manually if you want it gone)"
+  echo "  Disable the mitmproxy extension in System Settings → Network Extensions."
+}
+
+case "${1:-}" in
+  setup)     cmd_setup ;;
+  on)        echo probe > "$SDM_HOME/state/STRATEGY"; ok "interception ON" ;;
+  off)       echo off   > "$SDM_HOME/state/STRATEGY"; ok "interception OFF (Safari downloads normally)" ;;
+  status)    cmd_status ;;
+  doctor)    cmd_doctor ;;
+  queue|ls)  python3 "$SDM_LIBEXEC/daemon/status.py" ;;
+  watch)     while true; do clear; bold "Safari Download Manager"; echo; python3 "$SDM_LIBEXEC/daemon/status.py"; sleep 1; done ;;
+  misses)    tail -20 "$SDM_HOME/logs/misses.log" 2>/dev/null || echo "  (no misses - good)" ;;
+  log)       tail -f "$SDM_HOME/logs/$LBL_PROXY.log" ;;
+  start)     load "$LBL_ARIA2"; sleep 2; load "$LBL_PROXY"; load "$LBL_WATCH"; ok "started" ;;
+  stop)      for l in "$LBL_PROXY" "$LBL_ARIA2" "$LBL_WATCH"; do unload "$l"; done; ok "stopped" ;;
+  restart)   "$0" stop; sleep 2; "$0" start ;;
+  uninstall) cmd_uninstall ;;
+  *) cat <<USAGE
+safari-download-manager - IDM-style download interception for Safari
+
+  sdm setup       first-run: CA, services, launch agents
+  sdm on | off    toggle interception
+  sdm status      health of proxy / engine / redirector
+  sdm doctor      full diagnostics
+  sdm queue       current downloads
+  sdm watch       live updating view
+  sdm misses      downloads that escaped interception
+  sdm start|stop|restart
+  sdm uninstall   remove services and untrust the CA
+USAGE
+  ;;
+esac
