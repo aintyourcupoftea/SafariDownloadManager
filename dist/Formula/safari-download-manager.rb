@@ -7,7 +7,9 @@ class SafariDownloadManager < Formula
   head "https://github.com/aintyourcupoftea/SafariDownloadManager.git", branch: "main"
 
   depends_on "aria2"
-  depends_on "mitmproxy"
+  # mitmproxy migrated from homebrew/core to homebrew/cask, so it is a cask
+  # dependency. Declaring it as a formula fails with "No available formula".
+  depends_on cask: "mitmproxy"
   depends_on :macos
   # Verified on macOS 26 (Tahoe). Local-mode interception and the QUIC
   # workaround have not been validated on older majors.
