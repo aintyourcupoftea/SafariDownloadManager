@@ -2,7 +2,18 @@
 # safari-download-manager - IDM-style download interception for Safari.
 set -uo pipefail
 
-SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve through symlinks. Homebrew symlinks bin/sdm into its bin dir, so a
+# naive dirname would point SDM_LIBEXEC at the wrong prefix entirely.
+_resolve() {
+  local p="$1" d
+  while [ -L "$p" ]; do
+    d="$(cd -P "$(dirname "$p")" && pwd)"
+    p="$(readlink "$p")"
+    case "$p" in /*) ;; *) p="$d/$p" ;; esac
+  done
+  cd -P "$(dirname "$p")" && pwd
+}
+SELF="$(_resolve "${BASH_SOURCE[0]}")"
 : "${SDM_LIBEXEC:=$(cd "$SELF/../libexec" 2>/dev/null && pwd)}"
 : "${SDM_HOME:=$HOME/Library/Application Support/SafariDownloadManager}"
 : "${SDM_DOWNLOAD_DIR:=$HOME/Downloads}"
