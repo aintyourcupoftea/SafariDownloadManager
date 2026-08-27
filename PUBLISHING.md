@@ -1,7 +1,11 @@
 # Publishing checklist
 
-The README's `brew tap` instructions only become true after all of these.
-Do them in order — the formula's `sha256` depends on the tag existing.
+**Status: published.** The tap is live at
+`aintyourcupoftea/homebrew-aintyourcupoftea` and v0.1.0 is tagged. What follows
+is the procedure for cutting the next version.
+
+
+Do these in order — the formula's `sha256` depends on the tag existing.
 
 ## 1. Push the code repo
 

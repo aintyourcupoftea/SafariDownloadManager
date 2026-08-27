@@ -11,11 +11,23 @@ sdm setup      # generates the CA, writes launch agents, starts services
 sdm on
 ```
 
-> **Not published yet.** The tap above goes live once the steps in
-> [PUBLISHING.md](PUBLISHING.md) are done. Until then, install from a clone:
+Homebrew requires third-party taps to be trusted, so the first command may ask
+you to run `brew trust aintyourcupoftea/aintyourcupoftea`.
+
+> **Toolchain note.** The formula ships only scripts and compiles nothing, but
+> Homebrew still refuses *any* source build when Xcode / Command Line Tools are
+> older than your macOS expects:
 >
 > ```
-> brew install mitmproxy aria2
+> Error: Your Xcode (26.6) is too outdated. Please update to Xcode 27.0
+> ```
+>
+> If you hit that after a macOS upgrade, update the Command Line Tools
+> (`sudo xcode-select --install`, or Software Update). Installing from a clone
+> needs no toolchain at all:
+>
+> ```
+> brew install --cask mitmproxy && brew install aria2
 > git clone https://github.com/aintyourcupoftea/SafariDownloadManager
 > cd SafariDownloadManager && ./dist/bin/sdm setup && ./dist/bin/sdm on
 > ```
